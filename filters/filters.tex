@@ -1,0 +1,635 @@
+\documentclass[12pt,a4paper]{article}
+
+% ====================
+% Packages
+% ====================
+\usepackage[margin=1in]{geometry}
+\usepackage{mathrsfs}
+\usepackage{graphicx}
+\usepackage{natbib}
+\usepackage{amsbsy}
+\usepackage{amsmath}
+\usepackage{amsthm}
+\usepackage{mathbbol}
+\usepackage{color}
+\usepackage{xcolor}
+\usepackage{float}
+\usepackage{hyperref}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{tikz}
+\usepackage{listings}
+\usepackage{tcolorbox}
+\usepackage{enumitem}
+
+% ====================
+% Theorem Environments
+% ====================
+\theoremstyle{definition}
+\newtheorem{definition}{Definition}[section]
+\newtheorem{proposition}{Proposition}[section]
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{lemma}{Lemma}[section]
+\newtheorem{corollary}{Corollary}[section]
+\newtheorem{example}{Example}[section]
+
+\theoremstyle{remark}
+\newtheorem{remark}{Remark}[section]
+
+% ====================
+% Code Listing Style
+% ====================
+\lstdefinestyle{pythonstyle}{
+	language=Python,
+	basicstyle=\ttfamily\small,
+	keywordstyle=\color{blue}\bfseries,
+	commentstyle=\color{gray}\itshape,
+	stringstyle=\color{red},
+	numbers=left,
+	numberstyle=\tiny\color{gray},
+	stepnumber=1,
+	numbersep=8pt,
+	backgroundcolor=\color{gray!5},
+	frame=single,
+	frameround=tttt,
+	rulecolor=\color{black!30},
+	breaklines=true,
+	breakatwhitespace=true,
+	tabsize=4,
+	showspaces=false,
+	showstringspaces=false,
+	captionpos=b,
+	xleftmargin=15pt,
+	xrightmargin=5pt
+}
+\lstset{style=pythonstyle}
+
+% ====================
+% Custom Commands
+% ====================
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\argmax}{\operatorname*{arg\,max}}
+
+% ====================
+% Hyperref Setup
+% ====================
+\hypersetup{
+	colorlinks=true,
+	linkcolor=blue,
+	filecolor=magenta,      
+	urlcolor=cyan,
+	citecolor=blue,
+	pdftitle={Particle Filter Guide},
+	pdfpagemode=FullScreen,
+}
+
+% ====================
+% Title Information
+% ====================
+\title{\textbf{Particle Filter and Differentiable Particle Filter}}
+\author{}
+\date{\today}
+
+\begin{document}
+	
+	\maketitle
+	
+	\begin{abstract}
+		This guide provides a practical, hands-on approach to understanding particle filters (PF) and differentiable particle filters (DPF). We follow the philosophy of ``getting your hands dirty first'' -- building intuition through implementation before diving into theoretical proofs. The guide covers the mathematical foundations, algorithmic details, and complete Python implementations of both standard and differentiable particle filters.
+	\end{abstract}
+	
+	\tableofcontents
+	\newpage
+	
+	% ====================
+	% Introduction
+	% ====================
+	\section{Introduction}
+	\label{sec:introduction}
+	
+	This guide provides a practical approach to understanding particle filters and their differentiable variants. The key insight is to start with implementation and visualization before exploring the underlying theory.
+	
+	\subsection{Learning Path}
+	
+	\begin{enumerate}[leftmargin=*]
+		\item Start with basic particle filter implementation
+		\item Understand the mathematical framework
+		\item Transition to differentiable versions
+		\item Apply to learning problems with gradient descent
+	\end{enumerate}
+	
+	% ====================
+	% Prerequisites
+	% ====================
+	\section{Prerequisites}
+	\label{sec:prerequisites}
+	
+	\subsection{Required Knowledge}
+	
+	\begin{itemize}[leftmargin=*]
+		\item Basic probability theory (Bayes' rule, conditional distributions)
+		\item Python programming
+		\item Basic linear algebra
+		\item Familiarity with NumPy and PyTorch
+	\end{itemize}
+	
+	\subsection{Software Requirements}
+	
+	The following Python packages are required:
+	
+	\begin{lstlisting}[language=Python]
+		import numpy as np
+		import matplotlib.pyplot as plt
+		import torch
+		import torch.nn as nn
+	\end{lstlisting}
+	
+	% ====================
+	% Mathematical Foundation
+	% ====================
+	\section{Mathematical Foundation}
+	\label{sec:mathematical-foundation}
+	
+	\subsection{State Space Model (SSM)}
+	
+	The generative model assumes a Hidden Markov Model (HMM) structure with the following components:
+	
+	\begin{tcolorbox}[colback=blue!5!white,colframe=blue!75!black,title=State Space Model]
+		\textbf{State Transition:}
+		\begin{equation}
+			x_t = f(x_{t-1}) + q_t, \quad q_t \sim \mathcal{N}(0, Q)
+		\end{equation}
+		
+		\textbf{Observation:}
+		\begin{equation}
+			y_t = g(x_t) + r_t, \quad r_t \sim \mathcal{N}(0, R)
+		\end{equation}
+	\end{tcolorbox}
+	
+	\subsubsection{Toy Example Specification}
+	
+	In our illustrative example:
+	\begin{itemize}
+		\item \textbf{State transition:} $x_t = 0.9x_{t-1} + \epsilon_t$, where $\epsilon_t \sim \mathcal{N}(0, 0.5^2)$
+		\item \textbf{Observation:} $y_t = x_t + \eta_t$, where $\eta_t \sim \mathcal{N}(0, 0.3^2)$
+	\end{itemize}
+	
+	\textbf{Goal:} Estimate the posterior distribution $p(x_t \mid y_{1:t})$
+	
+	\subsection{Bayesian Recursion}
+	
+	The optimal Bayesian filtering solution follows a two-step recursion:
+	
+	\begin{tcolorbox}[colback=green!5!white,colframe=green!75!black,title=Bayesian Filter]
+		\textbf{Prediction Step:}
+		\begin{equation}
+			p(x_t \mid y_{1:t-1}) = \int p(x_t \mid x_{t-1}) p(x_{t-1} \mid y_{1:t-1}) \, dx_{t-1}
+		\end{equation}
+		
+		\textbf{Update Step:}
+		\begin{equation}
+			p(x_t \mid y_{1:t}) \propto p(y_t \mid x_t) p(x_t \mid y_{1:t-1})
+		\end{equation}
+	\end{tcolorbox}
+	
+	\begin{remark}
+		This integral is intractable for nonlinear functions $f$ and $g$. The particle filter provides a Monte Carlo approximation to this recursion.
+	\end{remark}
+	
+	% ====================
+	% Standard Particle Filter
+	% ====================
+	\section{Standard Particle Filter}
+	\label{sec:standard-pf}
+	
+	\subsection{Core Idea}
+	
+	Approximate the posterior distribution with weighted samples (particles):
+	
+	\begin{equation}
+		p(x_t \mid y_{1:t}) \approx \sum_{i=1}^{N} w_t^{(i)} \delta(x_t - x_t^{(i)})
+	\end{equation}
+	
+	where:
+	\begin{itemize}
+		\item $x_t^{(i)}$: particle $i$ at time $t$
+		\item $w_t^{(i)}$: normalized weight of particle $i$
+		\item $N$: total number of particles
+		\item $\delta(\cdot)$: Dirac delta function
+	\end{itemize}
+	
+	\subsection{Algorithm}
+	
+	\begin{tcolorbox}[colback=yellow!5!white,colframe=orange!75!black,title=Particle Filter Algorithm]
+		
+		\textbf{Initialization:} For $i = 1, \ldots, N$
+		\begin{itemize}
+			\item Sample $x_0^{(i)} \sim p(x_0)$
+			\item Set $w_0^{(i)} = 1/N$
+		\end{itemize}
+		
+		\textbf{For each time step} $t = 1, 2, \ldots, T$:
+		
+		\begin{enumerate}
+			\item \textbf{Prediction:} For $i = 1, \ldots, N$
+			\begin{equation}
+				x_t^{(i)} \sim p(x_t \mid x_{t-1}^{(i)}) = \mathcal{N}(f(x_{t-1}^{(i)}), Q)
+			\end{equation}
+			
+			\item \textbf{Weight Update:} For $i = 1, \ldots, N$
+			\begin{equation}
+				\tilde{w}_t^{(i)} = w_{t-1}^{(i)} \cdot p(y_t \mid x_t^{(i)})
+			\end{equation}
+			where the likelihood is:
+			\begin{equation}
+				p(y_t \mid x_t^{(i)}) = \frac{1}{\sqrt{2\pi R}} \exp\left(-\frac{(y_t - g(x_t^{(i)}))^2}{2R}\right)
+			\end{equation}
+			
+			\item \textbf{Normalization:} For $i = 1, \ldots, N$
+			\begin{equation}
+				w_t^{(i)} = \frac{\tilde{w}_t^{(i)}}{\sum_{j=1}^{N} \tilde{w}_t^{(j)}}
+			\end{equation}
+			
+			\item \textbf{State Estimation:}
+			\begin{equation}
+				\hat{x}_t = \sum_{i=1}^{N} w_t^{(i)} x_t^{(i)}
+			\end{equation}
+			
+			\item \textbf{Resampling:} For $i = 1, \ldots, N$
+			\begin{itemize}
+				\item Draw $a_i \sim \text{Categorical}(w_t^{(1)}, \ldots, w_t^{(N)})$
+				\item Set $x_t^{(i)} \leftarrow x_t^{(a_i)}$
+				\item Reset $w_t^{(i)} \leftarrow 1/N$
+			\end{itemize}
+		\end{enumerate}
+	\end{tcolorbox}
+	
+	\subsection{Why Resampling?}
+	
+	\begin{remark}
+		Without resampling, most particles will have negligible weights after several iterations -- a phenomenon known as \textbf{particle degeneracy}. Resampling concentrates computational resources (particles) in high-probability regions of the state space.
+	\end{remark}
+	
+	% ====================
+	% Differentiable Particle Filter
+	% ====================
+	\section{Differentiable Particle Filter}
+	\label{sec:differentiable-pf}
+	
+	\subsection{Motivation}
+	
+	\textbf{Problem with Standard PF:}
+	\begin{itemize}
+		\item The resampling step uses discrete sampling: $a_i \sim \text{Categorical}(w_t)$
+		\item This operation is \textbf{non-differentiable}
+		\item Cannot compute gradients $\frac{\partial \mathcal{L}}{\partial \theta}$
+		\item Cannot use gradient descent to learn parameters $\theta = \{f_\theta, g_\theta, Q_\theta, R_\theta\}$
+	\end{itemize}
+	
+	\textbf{Solution:} Replace discrete resampling with a \textbf{soft, differentiable approximation}.
+	
+	\subsection{Key Modification: Soft Resampling via Gumbel-Softmax}
+	
+	Replace categorical sampling with the \textbf{Gumbel-Softmax} trick:
+	
+	\begin{equation}
+		\tilde{w}_t^{(i)} = \frac{\exp\left((\log w_t^{(i)} + g^{(i)}) / \tau\right)}{\sum_{j=1}^{N} \exp\left((\log w_t^{(j)} + g^{(j)}) / \tau\right)}
+	\end{equation}
+	
+	where:
+	\begin{itemize}
+		\item $g^{(i)} \sim \text{Gumbel}(0,1)$ are i.i.d. Gumbel random variables
+		\item $\tau > 0$ is the temperature parameter
+		\item As $\tau \to 0$: recovers hard (categorical) resampling
+		\item For $\tau > 0$: the operation becomes differentiable
+	\end{itemize}
+	
+	\textbf{Gumbel Sampling in Code:}
+	\begin{lstlisting}
+		g = -torch.log(-torch.log(torch.rand_like(weights) + eps) + eps)
+	\end{lstlisting}
+	
+	\subsection{Gradient Flow and End-to-End Learning}
+	
+	Since all operations are now differentiable, we can compute:
+	\begin{equation}
+		\frac{\partial \mathcal{L}}{\partial \theta}
+	\end{equation}
+	via backpropagation, where:
+	\begin{itemize}
+		\item $\theta$: learnable parameters in $f_\theta$, $g_\theta$, $Q_\theta$, $R_\theta$
+		\item $\mathcal{L} = \sum_{t=1}^{T} \|y_t - \hat{y}_t\|_2^2$ or other task-specific loss
+	\end{itemize}
+	
+	This enables \textbf{end-to-end learning} of latent dynamics and observation models.
+	
+	% ====================
+	% Implementation
+	% ====================
+	\section{Hands-On Implementation}
+	\label{sec:implementation}
+	
+	\subsection{Part 1: Standard Particle Filter}
+	
+	\begin{lstlisting}
+		import numpy as np
+		import matplotlib.pyplot as plt
+		
+		# Setup
+		T = 50   # Time steps
+		N = 1000 # Number of particles
+		
+		# Generate true hidden states and observations
+		true_x = np.zeros(T)
+		y = np.zeros(T)
+		true_x[0] = 0
+		
+		for t in range(1, T):
+		true_x[t] = 0.9 * true_x[t-1] + np.random.randn() * 0.5
+		
+		y = true_x + np.random.randn(T) * 0.3
+		
+		# Initialize particles
+		particles = np.random.randn(N)
+		weights = np.ones(N) / N
+		estimates = []
+		
+		# Main filter loop
+		for t in range(T):
+		# Prediction step
+		particles = 0.9 * particles + np.random.randn(N) * 0.5
+		
+		# Weight update
+		likelihood = np.exp(-0.5 * ((y[t] - particles) / 0.3)**2)
+		weights *= likelihood
+		weights += 1e-300  # Avoid zeros
+		weights /= np.sum(weights)
+		
+		# Estimate
+		est = np.sum(particles * weights)
+		estimates.append(est)
+		
+		# Resample
+		idx = np.random.choice(N, N, p=weights)
+		particles = particles[idx]
+		weights.fill(1.0 / N)
+		
+		# Visualization
+		plt.figure(figsize=(12, 6))
+		plt.plot(true_x, label="True State", linewidth=2)
+		plt.plot(y, label="Observations", alpha=0.5)
+		plt.plot(estimates, label="PF Estimate", linewidth=2)
+		plt.legend()
+		plt.xlabel("Time")
+		plt.ylabel("Value")
+		plt.title("Particle Filter Performance")
+		plt.grid(True)
+		plt.show()
+	\end{lstlisting}
+	
+	\textbf{Expected Output:}
+	\begin{itemize}
+		\item The particle filter estimate closely tracks the true hidden state
+		\item The estimate is smoother than raw observations
+	\end{itemize}
+	
+	\subsection{Part 2: Differentiable Particle Filter}
+	
+	\begin{lstlisting}
+		import torch
+		import torch.nn as nn
+		
+		def soft_resample(weights, eps=1e-8, temperature=0.1):
+		"""Differentiable resampling using Gumbel-Softmax"""
+		# Sample Gumbel noise
+		g = -torch.log(-torch.log(torch.rand_like(weights) + eps) + eps)
+		
+		# Add noise to log weights
+		logits = torch.log(weights + eps) + g
+		
+		# Apply softmax
+		return torch.nn.functional.softmax(logits / temperature, dim=0)
+		
+		# Setup
+		N = 100  # Fewer particles for faster training
+		T = 20
+		
+		# Generate data
+		x = torch.zeros(T)
+		x[0] = 0.
+		for t in range(1, T):
+		x[t] = 0.9 * x[t-1] + torch.randn(1) * 0.5
+		
+		y = x + torch.randn(T) * 0.3
+		
+		# Initialize particles
+		particles = torch.randn(N, requires_grad=False)
+		weights = torch.ones(N) / N
+		estimates = []
+		
+		# Main filter loop
+		for t in range(T):
+		# Prediction
+		particles = 0.9 * particles + torch.randn(N) * 0.5
+		
+		# Weight update
+		likelihood = torch.exp(-0.5 * ((y[t] - particles) / 0.3)**2)
+		weights = weights * likelihood
+		weights = weights / weights.sum()
+		
+		# Soft resampling (differentiable!)
+		weights = soft_resample(weights)
+		
+		# Estimate
+		est = torch.sum(particles * weights)
+		estimates.append(est)
+		
+		# Define loss and compute gradients
+		estimates_tensor = torch.stack(estimates)
+		loss = torch.mean((y - estimates_tensor)**2)
+		# loss.backward()  # Gradients can flow through!
+		
+		print(f"MSE Loss: {loss.item():.4f}")
+	\end{lstlisting}
+	
+	\subsection{Part 3: Learning System Parameters}
+	
+	\begin{lstlisting}
+		import torch
+		import torch.optim as optim
+		
+		class LearnableSSM(nn.Module):
+		"""State Space Model with learnable transition coefficient"""
+		def __init__(self):
+		super().__init__()
+		# Learnable parameter (initialized incorrectly)
+		self.transition_coef = nn.Parameter(torch.tensor(0.5))
+		self.process_noise = 0.5
+		self.obs_noise = 0.3
+		
+		def forward(self, y, N=100, T=None):
+		if T is None:
+		T = len(y)
+		
+		# Initialize
+		particles = torch.randn(N)
+		weights = torch.ones(N) / N
+		estimates = []
+		
+		for t in range(T):
+		# Prediction with learnable coefficient
+		particles = self.transition_coef * particles + \
+		torch.randn(N) * self.process_noise
+		
+		# Update
+		likelihood = torch.exp(-0.5 * ((y[t] - particles) / 
+		self.obs_noise)**2)
+		weights = weights * likelihood
+		weights = weights / weights.sum()
+		
+		# Soft resample
+		g = -torch.log(-torch.log(torch.rand_like(weights) + 1e-8) + 1e-8)
+		logits = torch.log(weights + 1e-8) + g
+		weights = torch.nn.functional.softmax(logits / 0.1, dim=0)
+		
+		# Estimate
+		est = torch.sum(particles * weights)
+		estimates.append(est)
+		
+		return torch.stack(estimates)
+		
+		# Generate training data (true coefficient = 0.9)
+		T_train = 50
+		x_true = torch.zeros(T_train)
+		for t in range(1, T_train):
+		x_true[t] = 0.9 * x_true[t-1] + torch.randn(1) * 0.5
+		y_train = x_true + torch.randn(T_train) * 0.3
+		
+		# Training
+		model = LearnableSSM()
+		optimizer = optim.Adam(model.parameters(), lr=0.01)
+		
+		print(f"Initial: {model.transition_coef.item():.4f}")
+		
+		for epoch in range(100):
+		optimizer.zero_grad()
+		x_pred = model(y_train)
+		loss = torch.mean((y_train - x_pred)**2)
+		loss.backward()
+		optimizer.step()
+		
+		if (epoch + 1) % 20 == 0:
+		print(f"Epoch {epoch+1}, Loss: {loss.item():.4f}, "
+		f"Coef: {model.transition_coef.item():.4f}")
+		
+		print(f"\nFinal: {model.transition_coef.item():.4f}")
+		print(f"True: 0.9")
+	\end{lstlisting}
+	
+	\textbf{Expected Result:} The learned coefficient converges toward the true value of 0.9.
+	
+	% ====================
+	% Advanced Topics
+	% ====================
+	\section{Advanced Topics}
+	\label{sec:advanced}
+	
+	\subsection{Particle Degeneracy}
+	
+	\textbf{Problem:} After several iterations, most particle weights become negligible.
+	
+	\textbf{Solutions:}
+	\begin{itemize}
+		\item Standard resampling (for classical PF)
+		\item Soft resampling (for DPF)
+		\item Adaptive number of particles
+		\item Regularization techniques
+		\item Monitoring effective sample size: $\text{ESS} = 1 / \sum_{i=1}^{N} (w_t^{(i)})^2$
+	\end{itemize}
+	
+	\subsection{Nonlinear Dynamics}
+	
+	Extend to nonlinear systems:
+	
+	\begin{lstlisting}
+		# Example: Sine transition
+		def nonlinear_transition(x, noise_std=0.5):
+		return torch.sin(x) + torch.randn_like(x) * noise_std
+		
+		# Use in forward pass
+		particles = nonlinear_transition(particles)
+	\end{lstlisting}
+	
+	\subsection{Comparison with Other Methods}
+	
+	\begin{table}[H]
+		\centering
+		\caption{Comparison of Filtering Methods}
+		\begin{tabular}{@{}lll@{}}
+			\toprule
+			\textbf{Method} & \textbf{Pros} & \textbf{Cons} \\
+			\midrule
+			Extended Kalman Filter & Fast, analytical & Fails for strong nonlinearity \\
+			Particle Filter & Handles any nonlinearity & Not differentiable \\
+			Differentiable PF & Learnable, handles nonlinearity & Computationally expensive \\
+			\bottomrule
+		\end{tabular}
+	\end{table}
+	
+	% ====================
+	% Summary
+	% ====================
+	\section{Summary}
+	\label{sec:summary}
+	
+	\begin{table}[H]
+		\centering
+		\caption{Standard vs Differentiable Particle Filter}
+		\begin{tabular}{@{}lll@{}}
+			\toprule
+			\textbf{Aspect} & \textbf{Standard PF} & \textbf{Differentiable PF} \\
+			\midrule
+			Transition & $x_t^{(i)} \sim p(x_t \mid x_{t-1}^{(i)})$ & Same \\
+			Likelihood & $p(y_t \mid x_t^{(i)})$ & Same \\
+			Weight Update & Hard normalization & Soft normalization \\
+			Resampling & Categorical sampling & Gumbel-Softmax \\
+			Gradient & Blocked & Flows via backprop \\
+			Purpose & State estimation & Learnable inference \\
+			\bottomrule
+		\end{tabular}
+	\end{table}
+	
+	% ====================
+	% References
+	% ====================
+
+	% ====================
+	% Appendix
+	% ====================
+	\appendix
+	
+	\section{Gumbel Distribution}
+	\label{app:gumbel}
+	
+	The Gumbel distribution enables differentiable sampling from categorical distributions.
+	
+	\subsection{Gumbel-Max Trick}
+	
+	If $g_i \sim \text{Gumbel}(0,1)$ independently, then:
+	\begin{equation}
+		\argmax_i (\log \pi_i + g_i) \sim \text{Categorical}(\pi)
+	\end{equation}
+	
+	\subsection{Gumbel-Softmax Relaxation}
+	
+	Replace $\argmax$ with $\text{softmax}$ for differentiability:
+	\begin{equation}
+		\tilde{\pi}_i = \frac{\exp((\log \pi_i + g_i)/\tau)}{\sum_j \exp((\log \pi_j + g_j)/\tau)}
+	\end{equation}
+	
+	This provides a continuous, differentiable approximation to categorical sampling.
+
+	
+	
+\end{document}
