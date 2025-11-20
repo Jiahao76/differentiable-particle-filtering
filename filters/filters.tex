@@ -196,10 +196,102 @@
 	\begin{remark}
 		This integral is intractable for nonlinear functions $f$ and $g$. The particle filter provides a Monte Carlo approximation to this recursion.
 	\end{remark}
-	
-	% ====================
-	% Standard Particle Filter
-	% ====================
+\section{The Kalman Filter: Optimality and Stability}
+\label{sec:kalman-filter}
+
+While Particle Filters (PF) provide a generalized solution for non-linear non-Gaussian systems [cite: 152], the Kalman Filter (KF) remains the optimal Minimum Mean Square Error (MMSE) estimator for Linear-Gaussian State Space Models (LGSSM)[cite: 196]. However, in practical financial engineering applications involving high-dimensional data or single-precision arithmetic (e.g., GPU computing), standard KF implementations often suffer from numerical instability. 
+
+This section outlines the theoretical foundation of the LGSSM and derives the \textbf{Joseph stabilized form}, which guarantees the preservation of the covariance matrix's positive definiteness.
+
+\subsection{Linear-Gaussian State Space Model}
+
+We consider the classic Linear-Gaussian model as described in Example 2 of Doucet and Johansen (2011). The system is defined by the following stochastic difference equations:
+
+\begin{tcolorbox}[colback=gray!5!white,colframe=gray!50!black,title=LGSSM Definition]
+	\textbf{State Evolution:}
+	\begin{equation}
+		x_t = F x_{t-1} + w_t, \quad w_t \sim \mathcal{N}(0, Q)
+	\end{equation}
+	\textbf{Observation:}
+	\begin{equation}
+		y_t = H x_t + v_t, \quad v_t \sim \mathcal{N}(0, R)
+	\end{equation}
+\end{tcolorbox}
+
+where $x_t \in \mathbb{R}^{n_x}$ is the hidden state, $y_t \in \mathbb{R}^{n_y}$ is the observation, and $F, H, Q, R$ are matrices of appropriate dimensions[cite: 193, 194]. The noise terms $w_t$ and $v_t$ are assumed to be uncorrelated Gaussian white noise sequences.
+
+\subsection{The Standard Kalman Recursion}
+
+The recursive solution for the posterior density $p(x_t | y_{1:t}) = \mathcal{N}(x_t; \hat{x}_{t|t}, P_{t|t})$ is given by the standard Kalman Filter equations[cite: 248].
+
+\textbf{1. Prediction (Time Update):}
+\begin{align}
+	\hat{x}_{t|t-1} &= F \hat{x}_{t-1|t-1} \\
+	P_{t|t-1} &= F P_{t-1|t-1} F^T + Q
+\end{align}
+
+\textbf{2. Correction (Measurement Update):}
+The optimal Kalman Gain $K_t$ minimizes the trace of the posterior covariance $P_{t|t}$:
+\begin{equation}
+	K_t = P_{t|t-1} H^T S_t^{-1}
+\end{equation}
+where $S_t = H P_{t|t-1} H^T + R$ is the innovation covariance. The state estimate is updated as:
+\begin{equation}
+	\hat{x}_{t|t} = \hat{x}_{t|t-1} + K_t (y_t - H \hat{x}_{t|t-1})
+\end{equation}
+
+\subsection{Numerical Instability and the Joseph Form}
+
+\subsubsection{The Problem: Loss of Positive Definiteness}
+The standard update equation for the error covariance matrix is derived as:
+\begin{equation}
+	\label{eq:standard_update}
+	P_{t|t} = (I - K_t H) P_{t|t-1}
+\end{equation}
+Mathematically, Eq. \eqref{eq:standard_update} is correct. However, numerically, it is prone to instability. 
+\begin{enumerate}
+	\item \textbf{Asymmetry:} Due to floating-point round-off errors, the computation of $(I - K_t H) P_{t|t-1}$ may result in a non-symmetric matrix, violating the property that covariance matrices must be symmetric.
+	\item \textbf{Indefiniteness:} Since Eq. \eqref{eq:standard_update} involves subtraction (implicitly within the $I - KH$ term), numerical errors can lead to $P_{t|t}$ having negative eigenvalues, rendering it non-positive definite. This causes the filter to diverge immediately.
+\end{enumerate}
+
+\subsubsection{The Solution: Joseph Stabilized Update}
+To address this, we employ the \textbf{Joseph form} (also known as the symmetric update formula). It provides a numerically robust way to compute $P_{t|t}$:
+
+\begin{tcolorbox}[colback=blue!5!white,colframe=blue!75!black,title=Joseph Stabilized Update]
+	\begin{equation}
+		\label{eq:joseph_form}
+		P_{t|t} = (I - K_t H) P_{t|t-1} (I - K_t H)^T + K_t R K_t^T
+	\end{equation}
+\end{tcolorbox}
+
+\textbf{Theoretical Justification:}
+Observe that Eq. \eqref{eq:joseph_form} is the sum of two terms:
+\begin{itemize}
+	\item The first term $(I - K_t H) P_{t|t-1} (I - K_t H)^T$ is a quadratic form. Since $P_{t|t-1}$ is positive definite (PD), this term is guaranteed to be positive semi-definite (PSD).
+	\item The second term $K_t R K_t^T$ is also a quadratic form involving the covariance $R$, guaranteeing it is PSD.
+\end{itemize}
+The sum of two PSD matrices is always PSD. Therefore, the Joseph form structurally guarantees the symmetry and positive semi-definiteness of the updated covariance, making it robust against round-off errors.
+
+\subsection{Stability Diagnostics: The Condition Number}
+
+To monitor the numerical health of the filter during execution, we analyze the \textbf{Condition Number} $\kappa(P_t)$ of the covariance matrix.
+
+\begin{definition}[Condition Number]
+	For a symmetric positive definite covariance matrix $P$, the condition number is the ratio of its largest eigenvalue to its smallest eigenvalue:
+	\begin{equation}
+		\kappa(P) = \frac{|\lambda_{\max}(P)|}{|\lambda_{\min}(P)|}
+	\end{equation}
+\end{definition}
+
+\textbf{Interpretation:}
+\begin{itemize}
+	\item \textbf{Well-conditioned ($\kappa \approx 1$):} The error distribution is spherical. Matrix inversion (required for $S_t^{-1}$) is numerically stable.
+	\item \textbf{Ill-conditioned ($\kappa \gg 1$):} The uncertainty ellipsoid is extremely elongated (high certainty in some directions, high uncertainty in others). This leads to a loss of precision during the inversion of $S_t$, potentially causing the filter to "explode."
+\end{itemize}
+
+In our TensorFlow implementation (Section \ref{sec:kf-implementation}), we explicitly log $\kappa(P_t)$ at each step. A diverging condition number (e.g., $> 10^{15}$ for float64) serves as an early warning signal for numerical instability.
+
+
 	\section{Standard Particle Filter}
 	\label{sec:standard-pf}
 	
@@ -327,211 +419,125 @@
 	% ====================
 	% Implementation
 	% ====================
-	\section{Hands-On Implementation}
-	\label{sec:implementation}
+
 	
-	\subsection{Part 1: Standard Particle Filter}
+\section{Implementation under TensorFlow Framework}
+\label{sec:kf-implementation}
+
+We implement the filter using low-level tensor operations under the TensorFlow framework.
+
+\subsection{The KalmanFilterTF Class}
+
+\begin{lstlisting}[language=Python, caption=Multidimensional Kalman Filter in TensorFlow]
+	import tensorflow as tf
+	import numpy as np
 	
-	\begin{lstlisting}
-		import numpy as np
-		import matplotlib.pyplot as plt
-		
-		# Setup
-		T = 50   # Time steps
-		N = 1000 # Number of particles
-		
-		# Generate true hidden states and observations
-		true_x = np.zeros(T)
-		y = np.zeros(T)
-		true_x[0] = 0
-		
-		for t in range(1, T):
-		true_x[t] = 0.9 * true_x[t-1] + np.random.randn() * 0.5
-		
-		y = true_x + np.random.randn(T) * 0.3
-		
-		# Initialize particles
-		particles = np.random.randn(N)
-		weights = np.ones(N) / N
-		estimates = []
-		
-		# Main filter loop
-		for t in range(T):
-		# Prediction step
-		particles = 0.9 * particles + np.random.randn(N) * 0.5
-		
-		# Weight update
-		likelihood = np.exp(-0.5 * ((y[t] - particles) / 0.3)**2)
-		weights *= likelihood
-		weights += 1e-300  # Avoid zeros
-		weights /= np.sum(weights)
-		
-		# Estimate
-		est = np.sum(particles * weights)
-		estimates.append(est)
-		
-		# Resample
-		idx = np.random.choice(N, N, p=weights)
-		particles = particles[idx]
-		weights.fill(1.0 / N)
-		
-		# Visualization
-		plt.figure(figsize=(12, 6))
-		plt.plot(true_x, label="True State", linewidth=2)
-		plt.plot(y, label="Observations", alpha=0.5)
-		plt.plot(estimates, label="PF Estimate", linewidth=2)
-		plt.legend()
-		plt.xlabel("Time")
-		plt.ylabel("Value")
-		plt.title("Particle Filter Performance")
-		plt.grid(True)
-		plt.show()
-	\end{lstlisting}
+	class KalmanFilterTF:
+	"""
+	TensorFlow implementation of Kalman Filter with Joseph Stabilized Update.
+	"""
+	def __init__(self, F, H, Q, R, x_init, P_init):
+	# Ensure all inputs are float32 tensors
+	self.F = tf.cast(F, dtype=tf.float32)
+	self.H = tf.cast(H, dtype=tf.float32)
+	self.Q = tf.cast(Q, dtype=tf.float32)
+	self.R = tf.cast(R, dtype=tf.float32)
+	self.x = tf.reshape(tf.cast(x_init, dtype=tf.float32), (-1, 1))
+	self.P = tf.cast(P_init, dtype=tf.float32)
 	
-	\textbf{Expected Output:}
-	\begin{itemize}
-		\item The particle filter estimate closely tracks the true hidden state
-		\item The estimate is smoother than raw observations
-	\end{itemize}
+	def predict(self):
+	"""Time Update: x = Fx, P = FPF' + Q"""
+	self.x = tf.matmul(self.F, self.x)
+	fp = tf.matmul(self.F, self.P)
+	self.P = tf.matmul(fp, self.F, transpose_b=True) + self.Q
+	return self.x, self.P
 	
-	\subsection{Part 2: Differentiable Particle Filter}
+	def update(self, z_meas):
+	"""
+	Measurement Update using Joseph Form for Stability.
+	"""
+	z_meas = tf.reshape(tf.cast(z_meas, dtype=tf.float32), (-1, 1))
 	
-	\begin{lstlisting}
-		import torch
-		import torch.nn as nn
-		
-		def soft_resample(weights, eps=1e-8, temperature=0.1):
-		"""Differentiable resampling using Gumbel-Softmax"""
-		# Sample Gumbel noise
-		g = -torch.log(-torch.log(torch.rand_like(weights) + eps) + eps)
-		
-		# Add noise to log weights
-		logits = torch.log(weights + eps) + g
-		
-		# Apply softmax
-		return torch.nn.functional.softmax(logits / temperature, dim=0)
-		
-		# Setup
-		N = 100  # Fewer particles for faster training
-		T = 20
-		
-		# Generate data
-		x = torch.zeros(T)
-		x[0] = 0.
-		for t in range(1, T):
-		x[t] = 0.9 * x[t-1] + torch.randn(1) * 0.5
-		
-		y = x + torch.randn(T) * 0.3
-		
-		# Initialize particles
-		particles = torch.randn(N, requires_grad=False)
-		weights = torch.ones(N) / N
-		estimates = []
-		
-		# Main filter loop
-		for t in range(T):
-		# Prediction
-		particles = 0.9 * particles + torch.randn(N) * 0.5
-		
-		# Weight update
-		likelihood = torch.exp(-0.5 * ((y[t] - particles) / 0.3)**2)
-		weights = weights * likelihood
-		weights = weights / weights.sum()
-		
-		# Soft resampling (differentiable!)
-		weights = soft_resample(weights)
-		
-		# Estimate
-		est = torch.sum(particles * weights)
-		estimates.append(est)
-		
-		# Define loss and compute gradients
-		estimates_tensor = torch.stack(estimates)
-		loss = torch.mean((y - estimates_tensor)**2)
-		# loss.backward()  # Gradients can flow through!
-		
-		print(f"MSE Loss: {loss.item():.4f}")
-	\end{lstlisting}
+	# 1. Innovation
+	z_pred = tf.matmul(self.H, self.x)
+	y_residual = z_meas - z_pred
 	
-	\subsection{Part 3: Learning System Parameters}
+	# 2. Innovation Covariance S = HPH' + R
+	hp = tf.matmul(self.H, self.P)
+	S = tf.matmul(hp, self.H, transpose_b=True) + self.R
 	
-	\begin{lstlisting}
-		import torch
-		import torch.optim as optim
-		
-		class LearnableSSM(nn.Module):
-		"""State Space Model with learnable transition coefficient"""
-		def __init__(self):
-		super().__init__()
-		# Learnable parameter (initialized incorrectly)
-		self.transition_coef = nn.Parameter(torch.tensor(0.5))
-		self.process_noise = 0.5
-		self.obs_noise = 0.3
-		
-		def forward(self, y, N=100, T=None):
-		if T is None:
-		T = len(y)
-		
-		# Initialize
-		particles = torch.randn(N)
-		weights = torch.ones(N) / N
-		estimates = []
-		
-		for t in range(T):
-		# Prediction with learnable coefficient
-		particles = self.transition_coef * particles + \
-		torch.randn(N) * self.process_noise
-		
-		# Update
-		likelihood = torch.exp(-0.5 * ((y[t] - particles) / 
-		self.obs_noise)**2)
-		weights = weights * likelihood
-		weights = weights / weights.sum()
-		
-		# Soft resample
-		g = -torch.log(-torch.log(torch.rand_like(weights) + 1e-8) + 1e-8)
-		logits = torch.log(weights + 1e-8) + g
-		weights = torch.nn.functional.softmax(logits / 0.1, dim=0)
-		
-		# Estimate
-		est = torch.sum(particles * weights)
-		estimates.append(est)
-		
-		return torch.stack(estimates)
-		
-		# Generate training data (true coefficient = 0.9)
-		T_train = 50
-		x_true = torch.zeros(T_train)
-		for t in range(1, T_train):
-		x_true[t] = 0.9 * x_true[t-1] + torch.randn(1) * 0.5
-		y_train = x_true + torch.randn(T_train) * 0.3
-		
-		# Training
-		model = LearnableSSM()
-		optimizer = optim.Adam(model.parameters(), lr=0.01)
-		
-		print(f"Initial: {model.transition_coef.item():.4f}")
-		
-		for epoch in range(100):
-		optimizer.zero_grad()
-		x_pred = model(y_train)
-		loss = torch.mean((y_train - x_pred)**2)
-		loss.backward()
-		optimizer.step()
-		
-		if (epoch + 1) % 20 == 0:
-		print(f"Epoch {epoch+1}, Loss: {loss.item():.4f}, "
-		f"Coef: {model.transition_coef.item():.4f}")
-		
-		print(f"\nFinal: {model.transition_coef.item():.4f}")
-		print(f"True: 0.9")
-	\end{lstlisting}
+	# 3. Kalman Gain K = PH'S^{-1}
+	# Using cholesky solve is preferred for stability if S is positive definite
+	pht = tf.matmul(self.P, self.H, transpose_b=True)
+	K = tf.matmul(pht, tf.linalg.inv(S)) 
 	
-	\textbf{Expected Result:} The learned coefficient converges toward the true value of 0.9.
+	# 4. State Update
+	self.x = self.x + tf.matmul(K, y_residual)
 	
-	% ====================
-	% Advanced Topics
-	% ====================
+	# 5. Joseph Stabilized Covariance Update
+	# P = (I-KH)P(I-KH)' + KRK'
+	dim_x = tf.shape(self.P)[0]
+	I = tf.eye(dim_x, dtype=tf.float32)
+	I_KH = I - tf.matmul(K, self.H)
+	
+	p_term = tf.matmul(tf.matmul(I_KH, self.P), I_KH, transpose_b=True)
+	r_term = tf.matmul(tf.matmul(K, self.R), K, transpose_b=True)
+	self.P = p_term + r_term
+	
+	return self.x, self.P
+\end{lstlisting}
+
+\subsection{Standard Particle Filter in TensorFlow}
+
+Here we implement the standard Particle Filter. Note that resampling (indexing) is non-differentiable, which motivates the Differentiable PF in the next section.
+
+\begin{lstlisting}[language=Python, caption=Standard Particle Filter (TensorFlow)]
+	def standard_particle_filter_tf(observations, n_particles=1000):
+	T = len(observations)
+	# Initialize particles (TensorFlow)
+	particles = tf.random.normal((n_particles,), stddev=1.0)
+	weights = tf.ones((n_particles,)) / n_particles
+	
+	estimates = []
+	
+	for t in range(T):
+	# 1. Prediction (Transition)
+	# x_t = 0.9 * x_{t-1} + noise
+	noise = tf.random.normal((n_particles,), stddev=0.5)
+	particles = 0.9 * particles + noise
+	
+	# 2. Weight Update (Likelihood)
+	# y_t = x_t + noise
+	obs = observations[t]
+	likelihood = tf.exp(-0.5 * ((obs - particles) / 0.3)**2)
+	weights *= likelihood
+	weights /= tf.reduce_sum(weights) + 1e-9
+	
+	# 3. Estimation
+	est = tf.reduce_sum(particles * weights)
+	estimates.append(est)
+	
+	# 4. Multinomial Resampling (Non-differentiable)
+	# We use tf.random.categorical for resampling indices
+	logits = tf.math.log(weights + 1e-9)
+	indices = tf.random.categorical(tf.reshape(logits, (1, -1)), n_particles)
+	indices = tf.reshape(indices, (-1,))
+	
+	particles = tf.gather(particles, indices)
+	weights = tf.ones((n_particles,)) / n_particles
+	
+	return tf.stack(estimates)
+\end{lstlisting}
+
+\subsection{Analysis: Numerical Stability via Condition Number}
+
+A key metric for the stability of the Kalman Filter is the \textbf{Condition Number} of the covariance matrix $P$. It is defined as the ratio of the largest to smallest eigenvalue:
+\begin{equation}
+	\kappa(P) = \frac{|\lambda_{\max}(P)|}{|\lambda_{\min}(P)|}
+\end{equation}
+
+In our implementation, we monitor $\kappa(P)$ at each step. A diverging condition number (e.g., $> 10^{15}$ for float64) indicates that the matrix is becoming singular, which leads to severe numerical errors in calculating the Kalman Gain. The Joseph form update helps maintain a healthy condition number by preserving symmetry.
+
 	\section{Advanced Topics}
 	\label{sec:advanced}
 	

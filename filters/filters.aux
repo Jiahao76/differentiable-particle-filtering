@@ -14,30 +14,42 @@
 \@writefile{toc}{\contentsline {subsection}{\numberline {3.1}State Space Model (SSM)}{3}{subsection.3.1}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsubsection}{\numberline {3.1.1}Toy Example Specification}{4}{subsubsection.3.1.1}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsection}{\numberline {3.2}Bayesian Recursion}{4}{subsection.3.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {4}Standard Particle Filter}{4}{section.4}\protected@file@percent }
-\newlabel{sec:standard-pf}{{4}{4}{Standard Particle Filter}{section.4}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {4.1}Core Idea}{4}{subsection.4.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {4.2}Algorithm}{5}{subsection.4.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {4.3}Why Resampling?}{5}{subsection.4.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {5}Differentiable Particle Filter}{6}{section.5}\protected@file@percent }
-\newlabel{sec:differentiable-pf}{{5}{6}{Differentiable Particle Filter}{section.5}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.1}Motivation}{6}{subsection.5.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.2}Key Modification: Soft Resampling via Gumbel-Softmax}{6}{subsection.5.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.3}Gradient Flow and End-to-End Learning}{6}{subsection.5.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {6}Hands-On Implementation}{7}{section.6}\protected@file@percent }
-\newlabel{sec:implementation}{{6}{7}{Hands-On Implementation}{section.6}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {6.1}Part 1: Standard Particle Filter}{7}{subsection.6.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {6.2}Part 2: Differentiable Particle Filter}{8}{subsection.6.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {6.3}Part 3: Learning System Parameters}{9}{subsection.6.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {7}Advanced Topics}{11}{section.7}\protected@file@percent }
-\newlabel{sec:advanced}{{7}{11}{Advanced Topics}{section.7}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {7.1}Particle Degeneracy}{11}{subsection.7.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {7.2}Nonlinear Dynamics}{11}{subsection.7.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {7.3}Comparison with Other Methods}{11}{subsection.7.3}\protected@file@percent }
-\@writefile{lot}{\contentsline {table}{\numberline {1}{\ignorespaces Comparison of Filtering Methods}}{11}{table.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {8}Summary}{11}{section.8}\protected@file@percent }
-\newlabel{sec:summary}{{8}{11}{Summary}{section.8}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {2}{\ignorespaces Standard vs Differentiable Particle Filter}}{11}{table.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {4}The Kalman Filter: Optimality and Stability}{4}{section.4}\protected@file@percent }
+\newlabel{sec:kalman-filter}{{4}{4}{The Kalman Filter: Optimality and Stability}{section.4}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.1}Linear-Gaussian State Space Model}{4}{subsection.4.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.2}The Standard Kalman Recursion}{5}{subsection.4.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.3}Numerical Instability and the Joseph Form}{5}{subsection.4.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {4.3.1}The Problem: Loss of Positive Definiteness}{5}{subsubsection.4.3.1}\protected@file@percent }
+\newlabel{eq:standard_update}{{11}{5}{The Problem: Loss of Positive Definiteness}{equation.4.11}{}}
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {4.3.2}The Solution: Joseph Stabilized Update}{5}{subsubsection.4.3.2}\protected@file@percent }
+\newlabel{eq:joseph_form}{{12}{5}{The Solution: Joseph Stabilized Update}{equation.4.12}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.4}Stability Diagnostics: The Condition Number}{6}{subsection.4.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {5}Standard Particle Filter}{6}{section.5}\protected@file@percent }
+\newlabel{sec:standard-pf}{{5}{6}{Standard Particle Filter}{section.5}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.1}Core Idea}{6}{subsection.5.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.2}Algorithm}{7}{subsection.5.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.3}Why Resampling?}{7}{subsection.5.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {6}Differentiable Particle Filter}{8}{section.6}\protected@file@percent }
+\newlabel{sec:differentiable-pf}{{6}{8}{Differentiable Particle Filter}{section.6}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.1}Motivation}{8}{subsection.6.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.2}Key Modification: Soft Resampling via Gumbel-Softmax}{8}{subsection.6.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.3}Gradient Flow and End-to-End Learning}{8}{subsection.6.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {7}Implementation under TensorFlow Framework}{9}{section.7}\protected@file@percent }
+\newlabel{sec:kf-implementation}{{7}{9}{Implementation under TensorFlow Framework}{section.7}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {7.1}The KalmanFilterTF Class}{9}{subsection.7.1}\protected@file@percent }
+\@writefile{lol}{\contentsline {lstlisting}{\numberline {1}Multidimensional Kalman Filter in TensorFlow}{9}{lstlisting.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {7.2}Standard Particle Filter in TensorFlow}{10}{subsection.7.2}\protected@file@percent }
+\@writefile{lol}{\contentsline {lstlisting}{\numberline {2}Standard Particle Filter (TensorFlow)}{10}{lstlisting.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {7.3}Analysis: Numerical Stability via Condition Number}{11}{subsection.7.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {8}Advanced Topics}{11}{section.8}\protected@file@percent }
+\newlabel{sec:advanced}{{8}{11}{Advanced Topics}{section.8}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {8.1}Particle Degeneracy}{11}{subsection.8.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {8.2}Nonlinear Dynamics}{11}{subsection.8.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {8.3}Comparison with Other Methods}{12}{subsection.8.3}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {1}{\ignorespaces Comparison of Filtering Methods}}{12}{table.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {9}Summary}{12}{section.9}\protected@file@percent }
+\newlabel{sec:summary}{{9}{12}{Summary}{section.9}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {2}{\ignorespaces Standard vs Differentiable Particle Filter}}{12}{table.2}\protected@file@percent }
 \@writefile{toc}{\contentsline {section}{\numberline {A}Gumbel Distribution}{12}{appendix.A}\protected@file@percent }
 \newlabel{app:gumbel}{{A}{12}{Gumbel Distribution}{appendix.A}{}}
 \@writefile{toc}{\contentsline {subsection}{\numberline {A.1}Gumbel-Max Trick}{12}{subsection.A.1}\protected@file@percent }
