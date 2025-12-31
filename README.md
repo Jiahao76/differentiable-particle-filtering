@@ -133,7 +133,7 @@ A sample benchmark output is shown below.
 
 ## Benchmark Example
 
-![Benchmark Summary](benchmark_summary.png)
+![Benchmark Summary](/results/benchmark_summary.png)
 
 ---
 
