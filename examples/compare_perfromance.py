@@ -5,12 +5,10 @@ import tracemalloc
 import tensorflow as tf
 import numpy as np
 
-# --- 新增绘图库 ---
 import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
 
-# Ensure project root is in sys.path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 # Import Models
@@ -25,6 +23,11 @@ def export_benchmark_chart(results_data, filename='benchmark_summary.png'):
     """
     Generate a visual benchmark report (Runtime & Memory) instead of text output.
     """
+    # Ensure filename is in results directory
+    results_dir = os.path.join(os.path.dirname(__file__), '..', 'results')
+    os.makedirs(results_dir, exist_ok=True)
+    filepath = os.path.join(results_dir, os.path.basename(filename))
+    
     df = pd.DataFrame(results_data)
     
     # Set visual style
@@ -86,8 +89,8 @@ def export_benchmark_chart(results_data, filename='benchmark_summary.png'):
     # Adjust layout to make room for the text at bottom
     plt.subplots_adjust(bottom=0.15)
     
-    plt.savefig(filename, dpi=300)
-    print(f"\n✅ Plot generated successfully: {filename}")
+    plt.savefig(filepath, dpi=300)
+    print(f"\n✅ Plot generated successfully: {filepath}")
 
 def measure_performance(func, filter_name, *args, **kwargs):
     """

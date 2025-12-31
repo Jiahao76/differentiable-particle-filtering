@@ -112,3 +112,36 @@ class StochasticVolatilityModel(StateSpaceModel):
             log_prob = tf.reduce_sum(log_prob, axis=-1)
             
         return log_prob
+    
+    def transition_log_pdf(self, x_curr: tf.Tensor, x_prev: tf.Tensor) -> tf.Tensor:
+        """
+        Compute log p(x_curr | x_prev) for the state transition model.
+        
+        For SV model: X_t = alpha * X_{t-1} + sigma * V_t, V_t ~ N(0, 1)
+        So: X_t | X_{t-1} ~ N(alpha * X_{t-1}, sigma^2)
+        
+        Args:
+            x_curr (tf.Tensor): Current state X_t. Shape: [num_particles, state_dim]
+            x_prev (tf.Tensor): Previous state X_{t-1}. Shape: [num_particles, state_dim]
+        
+        Returns:
+            tf.Tensor: Log probability p(x_curr | x_prev). Shape: [num_particles]
+        """
+        # Mean of transition: mu_t = alpha * X_{t-1}
+        mean = self.alpha * x_prev
+        
+        # Variance: sigma^2
+        var = self.sigma ** 2
+        std = self.sigma
+        
+        # Log-likelihood of Normal distribution
+        # log p(x | mean, std) = -log(std) - 0.5 * ((x - mean) / std)^2
+        log_prob = -tf.math.log(std) - 0.5 * ((x_curr - mean) / std) ** 2
+        
+        # Sum across dimensions if multidimensional
+        if self.state_dim > 1:
+            log_prob = tf.reduce_sum(log_prob, axis=-1)
+        else:
+            log_prob = tf.reshape(log_prob, [-1])
+            
+        return log_prob

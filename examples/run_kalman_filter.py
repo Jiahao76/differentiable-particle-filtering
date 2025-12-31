@@ -1,6 +1,10 @@
+import os
+import sys
 import numpy as np
 import tensorflow as tf
 import matplotlib.pyplot as plt
+
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'src'))
 from kalman_filter import KalmanFilterTF
 
 def run_experiment():
@@ -93,7 +97,26 @@ def run_experiment():
     plt.ylabel('Position')
     plt.legend()
     plt.grid(True, alpha=0.3)
+
+    # Export results
+    out_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'results'))
+    os.makedirs(out_dir, exist_ok=True)
+    fig_path = os.path.join(out_dir, 'run_kalman_filter.png')
+    data_path = os.path.join(out_dir, 'run_kalman_filter.npz')
+
+    plt.savefig(fig_path, dpi=300)
+    np.savez(
+        data_path,
+        true_pos=np.array(true_pos),
+        meas_pos=np.array(meas_pos),
+        est_pos=np.array(est_pos),
+        std_devs=np.array(std_devs),
+    )
+
     plt.show()
+
+    print(f"Saved plot to {fig_path}")
+    print(f"Saved data to {data_path}")
 
 if __name__ == "__main__":
     run_experiment()

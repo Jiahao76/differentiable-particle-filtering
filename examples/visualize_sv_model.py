@@ -5,7 +5,6 @@ import tensorflow as tf
 import matplotlib.pyplot as plt
 
 # Add the project root to the system path to allow importing from 'src'
-# This assumes the script is running from the 'examples' directory
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from src.models.sv_model import StochasticVolatilityModel
@@ -90,7 +89,9 @@ def run_simulation():
     plt.grid(True, alpha=0.3)
     
     # Save the figure
-    save_path = os.path.join(os.path.dirname(__file__), 'sv_model_simulation.png')
+    results_dir = os.path.join(os.path.dirname(__file__), '..', 'results')
+    os.makedirs(results_dir, exist_ok=True)
+    save_path = os.path.join(results_dir, 'sv_model_simulation.png')
     plt.savefig(save_path, dpi=300, bbox_inches='tight')
     print(f"Figure saved to: {save_path}")
     

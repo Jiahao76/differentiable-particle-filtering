@@ -72,6 +72,14 @@ def main():
     plt.grid(True, alpha=0.3)
     
     plt.tight_layout()
+    
+    # Save the figure
+    results_dir = os.path.join(os.path.dirname(__file__), '..', 'results')
+    os.makedirs(results_dir, exist_ok=True)
+    save_path = os.path.join(results_dir, 'particle_filter_tracking.png')
+    plt.savefig(save_path, dpi=300, bbox_inches='tight')
+    print(f"Figure saved to: {save_path}")
+    
     plt.show()
     
     # Calculate RMSE
