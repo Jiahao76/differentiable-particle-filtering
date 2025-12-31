@@ -1,106 +1,167 @@
+
 # Differentiable Particle Filtering
 
-Implementation of particle flow methods for nonlinear filtering, focusing on the Exact Daum-Huang (EDH) and Particle Flow Particle Filter (PF-PF) methods from Li & Coates (2017).
+This project explores **particle filtering for state-space models** with a focus on making particle filters **differentiable and trainable end-to-end** using modern deep learning frameworks (TensorFlow).  
+It combines classical Bayesian filtering (PF, EKF, UKF, KF) with ideas from **continuous relaxations of discrete sampling** (e.g. Gumbel-Softmax) to enable gradient-based learning.
 
-## Features
+The repository currently provides:
+- A clean implementation of **Standard Particle Filtering (SIR)**
+- **Extended Kalman Filter (EKF)** and **Unscented Kalman Filter (UKF)** baselines
+- A **Stochastic Volatility (SV)** state-space model
+- Benchmark scripts comparing accuracy and runtime
+- A LaTeX report describing the theory and motivation for differentiable particle filters
 
-- **EDH Flow Filter**: Exact Daum-Huang particle flow with global linearization
-- **LEDH Flow Filter**: Local Exact Daum-Huang with per-particle linearization
-- **PF-PF (EDH)**: Particle Flow Particle Filter using EDH proposal
-- **PF-PF (LEDH)**: Particle Flow Particle Filter using LEDH proposal
-- **Stochastic Volatility Model**: Implementation for financial time series
+---
 
-## Installation
+## Motivation
+
+Particle filters are powerful but difficult to integrate with gradient-based learning due to their **non-differentiable resampling step**.
+This project investigates approaches to:
+
+- Relax categorical resampling into **continuous, differentiable approximations**
+- Enable **parameter learning** in state-space models using backpropagation
+- Compare particle filtering with EKF/UKF in terms of performance and scalability
+
+---
+
+## Repository Structure
+
+```
+differentiable-particle-filtering/
+│
+├── src/
+│   ├── filters/
+│   │   ├── particle_filter.py   # Standard SIR particle filter
+│   │   ├── ekf.py               # Extended Kalman Filter
+│   │   ├── ukf.py               # Unscented Kalman Filter
+│   │   └── kf.py                # Kalman Filter (linear Gaussian)
+│   │
+│   ├── models/
+│   │   ├── state_space_model.py # Abstract model interface
+│   │   ├── sv_model.py          # Stochastic Volatility model
+│   │   └── lgssm.py             # Linear Gaussian SSM
+│   │
+│   └── utils/
+│       └── helpers.py
+│
+├── examples/
+│   ├── run_particle_filter.py   # Run PF on simulated data
+│   ├── compare_perfromance.py   # PF vs EKF vs UKF benchmark
+│   └── simulate_sv.py
+│
+├── reports/
+│   └── filters.tex              # Theory and motivation (LaTeX)
+│
+├── requirements.txt
+└── README.md
+```
+
+---
+
+## Implemented Filters
+
+- **Kalman Filter (KF)**  
+  For linear Gaussian state-space models.
+
+- **Extended Kalman Filter (EKF)**  
+  Uses automatic differentiation to compute Jacobians.
+
+- **Unscented Kalman Filter (UKF)**  
+  Sigma-point based nonlinear filtering.
+
+- **Particle Filter (SIR)**  
+  Sequential Importance Resampling with ESS-based resampling.
+
+> ⚠️ Note: The current particle filter uses *hard categorical resampling*.
+> Differentiable resampling is discussed in the report and planned as an extension.
+
+---
+
+## Models
+
+### Stochastic Volatility (SV) Model
+The SV model is defined as:
+```
+x_t = α x_{t-1} + σ ε_t
+y_t = β exp(x_t / 2) η_t
+```
+where:
+- ε_t, η_t ~ N(0, 1)
+
+The log-likelihood is implemented explicitly, making it suitable for particle filtering.
+
+### Linear Gaussian State Space Model (LGSSM)
+A standard linear dynamical system used primarily for KF/EKF/UKF benchmarks.
+
+---
+
+## Getting Started
+
+### Installation
+
+Create a virtual environment and install dependencies:
 
 ```bash
 pip install -r requirements.txt
 ```
 
-Requirements:
-- TensorFlow 2.x
-- NumPy
-- Matplotlib
-- Seaborn
-- SciPy
-
-## Quick Start
-
-### Run Main Replication Script
+### Run Particle Filter Example
 
 ```bash
-python examples/replicate_li17.py
+python examples/run_particle_filter.py
 ```
 
-This will run EDH Flow and PF-PF (EDH) on the Stochastic Volatility model and save results to `results/` folder.
+This will:
+- Simulate data from the SV model
+- Run the particle filter
+- Plot filtered states and effective sample size (ESS)
 
-### Visualize SV Model
-
-```bash
-python examples/visualize_sv_model.py
-```
-
-### Compare Performance
+### Benchmark Filters
 
 ```bash
 python examples/compare_perfromance.py
 ```
 
-## Testing
+This compares runtime and performance of:
+- Particle Filter
+- EKF
+- UKF
 
-Run the test suite:
+A sample benchmark output is shown below.
 
-```bash
-pytest
-```
+---
 
-Run with coverage report:
+## Benchmark Example
 
-```bash
-pytest --cov=src --cov-report=html
-```
+![Benchmark Summary](benchmark_summary.png)
 
-See [TESTING.md](TESTING.md) for detailed testing instructions.
+---
 
-## Project Structure
+## Research Direction: Differentiable Particle Filtering
 
-```
-├── src/
-│   ├── models/
-│   │   ├── sv_model.py         # Stochastic Volatility model
-│   │   └── base_model.py       # Base state space model
-│   └── filters/
-│       ├── edh_flow.py         # EDH flow filter
-│       ├── ledh_flow.py        # LEDH flow filter
-│       ├── pfpf_edh.py         # PF-PF with EDH
-│       └── pfpf_ledh.py        # PF-PF with LEDH
-├── examples/
-│   ├── replicate_li17.py       # Main replication script
-│   └── visualize_sv_model.py   # Visualization tools
-├── tests/
-│   ├── test_models.py          # Model unit tests
-│   └── test_integration.py     # Integration tests
-└── results/                     # Output folder for results
-```
+The accompanying LaTeX report (`reports/filters.tex`) discusses:
+- Why resampling breaks differentiability
+- Continuous relaxations using **Gumbel-Softmax / Concrete distributions**
+- Strategies for end-to-end learning in particle filters
 
-## Key Results
+Planned extensions include:
+- Differentiable (soft) resampling layers
+- Parameter learning via gradient descent
+- Comparison with non-resampled particle filters
 
-Performance on Stochastic Volatility Model (T=100, N=100 particles):
-
-| Method      | RMSE  | ESS   | Runtime |
-|-------------|-------|-------|---------|
-| EDH Flow    | 3.43  | N/A   | 7.4s    |
-| PF-PF (EDH) | 1.35  | 54.4% | 7.6s    |
-
-- PF-PF (EDH) achieves **61% improvement** over EDH Flow
-- Effective Sample Size maintains at **54%** (good particle utilization)
-
-See `LEDH_INVESTIGATION.md` for detailed analysis of LEDH performance.
+---
 
 ## References
 
-- Li, Y., & Coates, M. (2017). Particle filtering with invertible particle flow. *arXiv preprint arXiv:1712.08776*.
-- Daum, F., & Huang, J. (2010). Exact particle flow for nonlinear filters. *SPIE Defense, Security, and Sensing*.
+- Doucet, A., de Freitas, N., & Gordon, N. (2001). *Sequential Monte Carlo Methods in Practice*
+- Maddison et al. (2017). *The Concrete Distribution*
+- Jang et al. (2017). *Categorical Reparameterization with Gumbel-Softmax*
 
-## License
+---
 
-MIT
+## Status
+
+🚧 **Research / Experimental Project**  
+This repository is intended for experimentation and learning rather than production use.
+
+Contributions, extensions, and refactors are welcome.
