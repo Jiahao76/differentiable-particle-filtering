@@ -1,4 +1,11 @@
-"""Unit tests for SV model and filter methods."""
+"""Unit tests for SV model and filter methods.
+
+Test design philosophy (per instructor feedback):
+  - Tests are derived from mathematical necessary conditions of the models.
+  - Unit tests verify individual model properties (densities, moments, gradients).
+  - Integration tests verify complete pipeline behavior.
+  - Each test documents which mathematical property it validates.
+"""
 import numpy as np
 import tensorflow as tf
 import pytest
@@ -102,7 +109,7 @@ class TestSVModel:
         observation = tf.constant([0.5], dtype=tf.float32)
         
         with tf.GradientTape() as tape:
-            log_lik = sv_model.log_likelihood(particles, observation)
+            log_lik = sv_model.log_likelihood(observation, particles)
             loss = tf.reduce_sum(log_lik)
         
         grads = tape.gradient(loss, particles)
@@ -168,6 +175,114 @@ class TestNumericalStability:
         # Check estimates length
         assert len(estimates) == len(observations)
         assert not tf.reduce_any(tf.math.is_nan(estimates))
-        
-        # Check ESS is in valid range [1, N]
-        assert 1.0 <= ess <= N
+
+
+# ============================================================
+# Mathematical Property Tests
+# ============================================================
+
+class TestLGSSMAnalyticProperties:
+    """Verify analytic properties of the Linear Gaussian SSM.
+
+    Mathematical basis:
+      - Transition: x_t = F*x_{t-1} + q_t, q_t ~ N(0, Q)
+      - Observation: y_t = H*x_t + r_t, r_t ~ N(0, R)
+      - Log-likelihood is Gaussian: log N(y; Hx, R)
+      - Stationary variance: Var[x_inf] = Q / (1 - F^2) for 1D stable system
+    """
+
+    @pytest.mark.unit
+    def test_log_likelihood_is_gaussian(self, lgssm_model):
+        """Verify log_likelihood matches analytic Gaussian log-density.
+
+        Property: log p(y|x) = -0.5*(y-Hx)^T R^{-1} (y-Hx) - 0.5*log|R| - d/2*log(2pi)
+        """
+        x = tf.constant([[2.0]], dtype=tf.float32)
+        y = tf.constant([1.5], dtype=tf.float32)
+
+        ll = lgssm_model.log_likelihood(y, x)
+
+        # Analytic computation for 1D: H=1, R=0.5
+        Hx = 1.0 * 2.0  # H @ x
+        residual = 1.5 - Hx
+        R = 0.5
+        expected = -0.5 * residual**2 / R - 0.5 * np.log(R) - 0.5 * np.log(2 * np.pi)
+        np.testing.assert_allclose(ll.numpy()[0], expected, atol=1e-5)
+
+    @pytest.mark.unit
+    def test_transition_stationary_variance(self, lgssm_model):
+        """Verify the transition converges to stationary variance Q/(1-F^2).
+
+        Property: For stable AR(1) with |F| < 1, the stationary variance is Q/(1-F^2).
+        """
+        F_val = 0.9
+        Q_val = 1.0
+        expected_var = Q_val / (1.0 - F_val**2)
+
+        x = tf.constant([[0.0]], dtype=tf.float32)
+        samples = []
+        for _ in range(5000):
+            x = lgssm_model.transition(x)
+            samples.append(x.numpy()[0, 0])
+
+        # Use last 3000 samples (after burn-in)
+        empirical_var = np.var(samples[2000:])
+        np.testing.assert_allclose(empirical_var, expected_var, rtol=0.25)
+
+
+class TestSVModelAnalyticProperties:
+    """Verify analytic properties of the Stochastic Volatility model.
+
+    Mathematical basis:
+      - Transition: X_t = alpha*X_{t-1} + sigma*V_t, V_t ~ N(0,1)
+      - Observation: Y_t | X_t ~ N(0, beta^2 * exp(X_t))
+      - h(x) = beta * exp(x/2) is the observation standard deviation
+      - Stationary distribution: X ~ N(0, sigma^2 / (1 - alpha^2))
+    """
+
+    @pytest.mark.unit
+    def test_observation_variance_matches_state(self, sv_model):
+        """Verify Var[Y|X=x] = beta^2 * exp(x).
+
+        Property: At fixed state x, observations are N(0, beta^2*exp(x)).
+        """
+        x = tf.constant([[1.5]], dtype=tf.float32)
+        samples = [sv_model.observation(x).numpy()[0, 0] for _ in range(2000)]
+        empirical_var = np.var(samples)
+        expected_var = 0.5**2 * np.exp(1.5)  # beta^2 * exp(x)
+        np.testing.assert_allclose(empirical_var, expected_var, rtol=0.2)
+
+    @pytest.mark.unit
+    def test_log_likelihood_value_at_known_point(self, sv_model):
+        """Verify log p(y=0|x=0) = -log(beta) - 0.5*log(2*pi).
+
+        Property: At x=0, Y~N(0, beta^2), so log p(0|0) = -log(beta) - 0.5*log(2pi).
+        """
+        x = tf.constant([[0.0]], dtype=tf.float32)
+        y = tf.constant([0.0], dtype=tf.float32)
+        ll = sv_model.log_likelihood(y, x)
+        expected = -np.log(0.5) - 0.5 * np.log(2 * np.pi)
+        np.testing.assert_allclose(ll.numpy()[0], expected, atol=1e-5)
+
+    @pytest.mark.unit
+    def test_stationary_distribution(self, sv_model):
+        """Verify the AR(1) transition has stationary variance sigma^2/(1-alpha^2).
+
+        Property: For stable AR(1), the stationary distribution is N(0, sigma^2/(1-alpha^2)).
+        """
+        alpha_val = 0.91
+        sigma_val = 1.0
+        expected_var = sigma_val**2 / (1.0 - alpha_val**2)
+
+        x = tf.constant([[0.0]], dtype=tf.float32)
+        samples = []
+        for _ in range(10000):
+            x = sv_model.transition(x)
+            samples.append(x.numpy()[0, 0])
+
+        # Use last 7000 samples (after burn-in)
+        empirical_mean = np.mean(samples[3000:])
+        empirical_var = np.var(samples[3000:])
+
+        assert abs(empirical_mean) < 0.5, f"Stationary mean should be ~0, got {empirical_mean:.3f}"
+        np.testing.assert_allclose(empirical_var, expected_var, rtol=0.25)

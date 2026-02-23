@@ -6,13 +6,13 @@ import tensorflow as tf
 import numpy as np
 
 class PFPF_LEDH:
-    def __init__(self, model, num_particles=100, flow_steps=20, step_size=0.05):
+    def __init__(self, model, num_particles=100, flow_steps=20, step_size=0.05,
+                 obs_noise_var=1.0):
         self.model = model
         self.num_particles = num_particles
         self.flow_steps = flow_steps
         self.epsilon = step_size
-        self.beta = model.beta
-        self.R = 1.0  # Observation noise variance
+        self.R = obs_noise_var
     
     def run(self, observations):
         T = tf.shape(observations)[0]
@@ -53,7 +53,7 @@ class PFPF_LEDH:
                 # H computed at CURRENT particle position (local linearization)
                 with tf.GradientTape() as tape:
                     tape.watch(current_particles)
-                    h_val = self.beta * tf.exp(current_particles / 2.0)
+                    h_val = self.model.observation_mean(current_particles)
                 
                 H = tape.gradient(h_val, current_particles) # Shape: (N, 1)
                 

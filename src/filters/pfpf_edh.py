@@ -28,20 +28,19 @@ class PFPF_EDH:
     No Jacobian determinant calculation needed!
     """
     
-    def __init__(self, model, num_particles=100, flow_steps=20, step_size=0.05):
+    def __init__(self, model, num_particles=100, flow_steps=20, step_size=0.05,
+                 obs_noise_var=1.0):
         self.model = model
         self.num_particles = num_particles
         self.flow_steps = flow_steps
         self.epsilon = step_size
-        
-        self.beta = model.beta
-        self.R = 1.0  # CRITICAL: Use R=1.0 for original space
+        self.R = obs_noise_var
     
     def compute_flow_parameters(self, eta_mean, P, observation, lambda_val):
-        """Compute EDH flow parameters (same as EDH filter)"""
+        """Compute EDH flow parameters (same as EDH filter)."""
         with tf.GradientTape() as tape:
             tape.watch(eta_mean)
-            h_mean = self.beta * tf.exp(eta_mean / 2.0)
+            h_mean = self.model.observation_mean(eta_mean)
         
         H = tape.gradient(h_mean, eta_mean)
         H_scalar = tf.reshape(H, [])

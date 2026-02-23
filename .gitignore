@@ -175,3 +175,12 @@ datasets/
 *.npz
 *.pkl
 *.pickle
+
+# R history
+.Rhistory
+
+# Archive
+archive/
+
+# Claude
+CLAUDE.md

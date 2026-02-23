@@ -10,30 +10,28 @@ import tensorflow as tf
 
 
 class LEDHFlowFilter:
-    """
-    Localized Exact Daum-Huang (LEDH) Particle Flow Filter
-    
+    """Localized Exact Daum-Huang (LEDH) Particle Flow Filter.
+
     Each particle uses INDIVIDUAL flow parameters computed at its own location.
-    
-    For SV model: y = β·exp(x/2)·w, w~N(0,1)
+    Generic: works with any model that provides ``observation_mean()``.
     """
-    
-    def __init__(self, model, num_particles=100, flow_steps=20, step_size=0.05):
-        """
+
+    def __init__(self, model, num_particles=100, flow_steps=20, step_size=0.05,
+                 obs_noise_var=1.0):
+        """Initialize the LEDH flow filter.
+
         Args:
-            model: State space model
-            num_particles: Number of particles
-            flow_steps: Number of discretization steps
-            step_size: Step size for each flow step
+            model: State-space model with ``transition`` and ``observation_mean``.
+            num_particles: Number of particles.
+            flow_steps: Number of discretization steps.
+            step_size: Euler step size.
+            obs_noise_var: Observation noise variance *R* used in the flow.
         """
         self.model = model
         self.num_particles = num_particles
         self.flow_steps = flow_steps
         self.epsilon = step_size
-        
-        # SV model parameters
-        self.beta = model.beta
-        self.R = 1.0  # Observation noise variance
+        self.R = obs_noise_var
     
     def run(self, observations):
         """
@@ -84,12 +82,12 @@ class LEDHFlowFilter:
                 # Key: Compute H at CURRENT particle positions (local linearization)
                 with tf.GradientTape(persistent=False) as tape:
                     tape.watch(particles)
-                    h_val = self.beta * tf.exp(particles / 2.0)
-                
+                    h_val = self.model.observation_mean(particles)
+
                 # H: Jacobian at each particle's current location
                 H = tape.gradient(h_val, particles)
                 if H is None:
-                    H = self.beta / 2.0 * tf.exp(particles / 2.0)
+                    H = tf.ones_like(particles)
                 
                 # LEDH flow parameters using shared P but per-particle H
                 denom = lambda_val * (H**2) * P + self.R

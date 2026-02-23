@@ -11,30 +11,28 @@ import numpy as np
 
 
 class EDHFlowFilter:
+    """Exact Daum-Huang (EDH) Particle Flow Filter.
+
+    All particles use the SAME flow parameters computed at the ensemble mean.
+    Generic: works with any model that provides ``observation_mean()``.
     """
-    Exact Daum-Huang (EDH) Particle Flow Filter
-    
-    All particles use the SAME flow parameters computed at ensemble mean.
-    
-    For SV model: y = β·exp(x/2)·w, w~N(0,1)
-    """
-    
-    def __init__(self, model, num_particles=100, flow_steps=20, step_size=0.05):
-        """
+
+    def __init__(self, model, num_particles=100, flow_steps=20, step_size=0.05,
+                 obs_noise_var=1.0):
+        """Initialize the EDH flow filter.
+
         Args:
-            model: State space model (must have transition, observation, log_likelihood methods)
-            num_particles: Number of particles
-            flow_steps: Number of discretization steps in pseudo-time λ ∈ [0,1]
-            step_size: Step size ε for each flow step
+            model: State-space model with ``transition`` and ``observation_mean``.
+            num_particles: Number of particles.
+            flow_steps: Number of discretization steps in pseudo-time.
+            step_size: Euler step size.
+            obs_noise_var: Observation noise variance *R* used in the flow.
         """
         self.model = model
         self.num_particles = num_particles
         self.flow_steps = flow_steps
         self.epsilon = step_size
-        
-        # SV model specific parameters
-        self.beta = model.beta
-        self.R = 1.0  # Observation noise variance (CRITICAL: R=1.0, not R=4.93!)
+        self.R = obs_noise_var
     
     def compute_flow_parameters(self, eta_mean, P, observation, lambda_val):
         """
@@ -56,12 +54,11 @@ class EDHFlowFilter:
             A: Flow coefficient matrix
             b: Flow offset vector
         """
-        # Linearize h(x) = β·exp(x/2) at eta_mean
         with tf.GradientTape() as tape:
             tape.watch(eta_mean)
-            h_mean = self.beta * tf.exp(eta_mean / 2.0)
-        
-        H = tape.gradient(h_mean, eta_mean)  # Jacobian: ∂h/∂x = 0.5*β*exp(x/2)
+            h_mean = self.model.observation_mean(eta_mean)
+
+        H = tape.gradient(h_mean, eta_mean)
         
         # For 1D case, simplify matrix operations
         H_scalar = tf.reshape(H, [])

@@ -25,16 +25,16 @@ class InvertibleFlowParticleFilter:
         
         This makes the gradient H = 1 (constant), which is extremely stable.
         """
-        beta = 0.5 # Assuming fixed beta from the problem, or extract from model if stored
-        
+        beta = self.model.beta
+
         # Theoretical h(x) in log-squared domain: h(x) = log(beta^2) + x
         # Note: We ignore the noise log(v^2) term for the deterministic gradient direction
-        h_x_log = tf.math.log(beta**2) + particles
-        
+        h_x_log = tf.math.log(beta**2 + 1e-8) + particles
+
         # Gradient is trivially 1.0, but we use AutoDiff to be generic
         with tf.GradientTape() as tape:
             tape.watch(particles)
-            output = tf.math.log(beta**2) + particles
+            output = tf.math.log(beta**2 + 1e-8) + particles
         H = tape.gradient(output, particles)
         
         return h_x_log, H

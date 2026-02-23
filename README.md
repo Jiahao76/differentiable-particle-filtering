@@ -1,97 +1,92 @@
-
 # Differentiable Particle Filtering
 
-This project explores **particle filtering for state-space models** with a focus on making particle filters **differentiable and trainable end-to-end** using modern deep learning frameworks (TensorFlow).  
-It combines classical Bayesian filtering (PF, EKF, UKF, KF) with ideas from **continuous relaxations of discrete sampling** (e.g. Gumbel-Softmax) to enable gradient-based learning.
+Implementation of particle flow filters and differentiable particle filters for state-space models, covering the full pipeline from classical Kalman filtering to HMC-based Bayesian parameter inference.
 
-The repository currently provides:
-- A clean implementation of **Standard Particle Filtering (SIR)**
-- **Extended Kalman Filter (EKF)** and **Unscented Kalman Filter (UKF)** baselines
-- A **Stochastic Volatility (SV)** state-space model
-- Benchmark scripts comparing accuracy and runtime
-- A LaTeX report describing the theory and motivation for differentiable particle filters
+Built with **TensorFlow 2** and **TensorFlow Probability**.
 
 ---
 
-## Motivation
-
-Particle filters are powerful but difficult to integrate with gradient-based learning due to their **non-differentiable resampling step**.
-This project investigates approaches to:
-
-- Relax categorical resampling into **continuous, differentiable approximations**
-- Enable **parameter learning** in state-space models using backpropagation
-- Compare particle filtering with EKF/UKF in terms of performance and scalability
-
----
-
-## Repository Structure
+## Project Structure
 
 ```
 differentiable-particle-filtering/
-│
 ├── src/
-│   ├── filters/
-│   │   ├── particle_filter.py   # Standard SIR particle filter
-│   │   ├── ekf.py               # Extended Kalman Filter
-│   │   ├── ukf.py               # Unscented Kalman Filter
-│   │   └── kf.py                # Kalman Filter (linear Gaussian)
+│   ├── models/                         # State-space models
+│   │   ├── base_model.py               #   Abstract base class
+│   │   ├── lgssm.py                    #   Linear Gaussian SSM (Doucet 2009)
+│   │   ├── sv_model.py                 #   Stochastic Volatility model
+│   │   ├── nonlinear_ssm.py            #   Nonlinear SSM (Andrieu et al. 2010)
+│   │   ├── bearing_only_tracking.py    #   Bearing-only tracking (Dai 2022)
+│   │   └── state_space_lstm.py         #   State-Space LSTM (Zheng 2017)
 │   │
-│   ├── models/
-│   │   ├── state_space_model.py # Abstract model interface
-│   │   ├── sv_model.py          # Stochastic Volatility model
-│   │   └── lgssm.py             # Linear Gaussian SSM
+│   ├── filters/                        # Filtering algorithms
+│   │   ├── kalman_filter.py            #   Kalman Filter (Joseph stabilized)
+│   │   ├── ekf.py                      #   Extended Kalman Filter
+│   │   ├── ukf.py                      #   Unscented Kalman Filter
+│   │   ├── particle_filter.py          #   Standard SIR Particle Filter
+│   │   ├── edh_flow.py                 #   Exact Daum-Huang flow
+│   │   ├── ledh_flow.py                #   Local EDH flow
+│   │   ├── pfpf_edh.py                 #   PF-PF with EDH (Li & Coates 2017)
+│   │   ├── pfpf_ledh.py                #   PF-PF with LEDH (Li & Coates 2017)
+│   │   ├── pfpf_enhanced.py            #   Enhanced PF-PF + optimal homotopy
+│   │   ├── flow_pf.py                  #   Invertible flow PF
+│   │   ├── particle_flow_filters.py    #   Stochastic particle flow (Dai 2022)
+│   │   ├── homotopy_optimizer.py       #   TPBVP solver for optimal homotopy
+│   │   ├── homotopy_optimizer_robust.py#   Robust TPBVP solver (non-convex)
+│   │   ├── differentiable_particle_filter.py  # DPF with OT resampling
+│   │   └── differentiable_pfpf.py      #   Differentiable LEDH + OT for HMC
 │   │
-│   └── utils/
-│       └── helpers.py
+│   └── inference/                      # Bayesian parameter inference
+│       ├── hmc.py                      #   Hamiltonian Monte Carlo
+│       ├── pmmh.py                     #   Particle Marginal MH (Andrieu 2010)
+│       └── particle_gibbs.py           #   Particle Gibbs (Zheng 2017)
 │
-├── examples/
-│   ├── run_particle_filter.py   # Run PF on simulated data
-│   ├── compare_perfromance.py   # PF vs EKF vs UKF benchmark
-│   └── simulate_sv.py
+├── examples/                           # Runnable scripts organized by question
+│   ├── part1_classical_filters/        #   KF, EKF, UKF, PF comparisons
+│   ├── part1_particle_flows/           #   EDH, LEDH, PF-PF (Li 2017)
+│   ├── part2_stochastic_flow/          #   Stochastic flow (Dai 2022)
+│   ├── part2_differentiable_pf/        #   DPF with OT resampling
+│   ├── bonus1_hmc_flows/               #   HMC + invertible flows + OT
+│   └── bonus3_neural_ssm/              #   SSL models + Particle Gibbs
 │
-├── reports/
-│   └── filters.tex              # Theory and motivation (LaTeX)
-│
-├── requirements.txt
-└── README.md
+├── tests/                              # Unit and integration tests
+├── results/                            # Generated figures and tables
+├── docs/                               # Detailed documentation and notes
+├── archive/                            # Historical experiment/debug scripts
+└── reports/                            # LaTeX report
 ```
 
 ---
 
-## Implemented Filters
+## Question Coverage
 
-- **Kalman Filter (KF)**  
-  For linear Gaussian state-space models.
+### Part 1: From Classical Filters to Particle Flows
 
-- **Extended Kalman Filter (EKF)**  
-  Uses automatic differentiation to compute Jacobians.
+| Question | Implementation | Example |
+|----------|---------------|---------|
+| 1.I — Kalman Filter for LGSSM | `src/filters/kalman_filter.py`, `src/models/lgssm.py` | `examples/part1_classical_filters/run_kalman_filter.py` |
+| 1.II.a — Nonlinear SSM design | `src/models/sv_model.py`, `src/models/bearing_only_tracking.py` | `examples/part1_classical_filters/visualize_sv_model.py` |
+| 1.II.b — EKF and UKF | `src/filters/ekf.py`, `src/filters/ukf.py` | `examples/part1_classical_filters/compare_performance.py` |
+| 1.II.c — Standard Particle Filter | `src/filters/particle_filter.py` | `examples/part1_classical_filters/run_particle_filter.py` |
+| 1.II.d — PF vs EKF/UKF benchmark | — | `examples/part1_classical_filters/compare_performance.py` |
+| 2.a — EDH, LEDH, PF-PF (Li 2017) | `src/filters/edh_flow.py`, `ledh_flow.py`, `pfpf_*.py` | `examples/part1_particle_flows/replicate_li17.py` |
+| 2.c — Flow comparison on SV model | — | `examples/part1_particle_flows/compare_flow.py` |
 
-- **Unscented Kalman Filter (UKF)**  
-  Sigma-point based nonlinear filtering.
+### Part 2: Stochastic Particle Flow and Differentiable PF
 
-- **Particle Filter (SIR)**  
-  Sequential Importance Resampling with ESS-based resampling.
+| Question | Implementation | Example |
+|----------|---------------|---------|
+| 1.a — Stochastic flow (Dai 2022) | `src/filters/particle_flow_filters.py`, `homotopy_optimizer*.py` | `examples/part2_stochastic_flow/replicate_dai22.py` |
+| 1.b — Optimal flow as PF-PF proposal | `src/filters/pfpf_enhanced.py` | `examples/part2_stochastic_flow/replicate_dai22_robust.py` |
+| 2.i — DPF with soft + OT resampling | `src/filters/differentiable_particle_filter.py` | `examples/part2_differentiable_pf/compare_dpf_resampling.py` |
 
-> ⚠️ Note: The current particle filter uses *hard categorical resampling*.
-> Differentiable resampling is discussed in the report and planned as an extension.
+### Bonus Questions
 
----
-
-## Models
-
-### Stochastic Volatility (SV) Model
-The SV model is defined as:
-```
-x_t = α x_{t-1} + σ ε_t
-y_t = β exp(x_t / 2) η_t
-```
-where:
-- ε_t, η_t ~ N(0, 1)
-
-The log-likelihood is implemented explicitly, making it suitable for particle filtering.
-
-### Linear Gaussian State Space Model (LGSSM)
-A standard linear dynamical system used primarily for KF/EKF/UKF benchmarks.
+| Question | Implementation | Example |
+|----------|---------------|---------|
+| Bonus 1 — HMC + invertible flows | `src/filters/differentiable_pfpf.py`, `src/inference/hmc.py` | `examples/bonus1_hmc_flows/bonus1_hmc_invertible_flows.py` |
+| Bonus 2 — Neural OT acceleration | See [BONUS2_NEURAL_OT_ACCELERATION.md](docs/BONUS2_NEURAL_OT_ACCELERATION.md) | (Theoretical analysis, implementation TBD) |
+| Bonus 3 — SSL + Particle Gibbs | `src/models/state_space_lstm.py`, `src/inference/particle_gibbs.py` | `examples/bonus3_neural_ssm/bonus3_example*.py` |
 
 ---
 
@@ -99,69 +94,44 @@ A standard linear dynamical system used primarily for KF/EKF/UKF benchmarks.
 
 ### Installation
 
-Create a virtual environment and install dependencies:
-
 ```bash
 pip install -r requirements.txt
 ```
 
-### Run Particle Filter Example
+### Quick Examples
 
 ```bash
-python examples/run_particle_filter.py
+# Part 1: Classical filters on LGSSM
+python examples/part1_classical_filters/run_kalman_filter.py
+
+# Part 1: Particle flow filters (Li & Coates 2017)
+python examples/part1_particle_flows/replicate_li17.py
+
+# Part 2: Stochastic particle flow (Dai 2022)
+python examples/part2_stochastic_flow/replicate_dai22_robust.py
+
+# Part 2: Differentiable PF with OT resampling
+python examples/part2_differentiable_pf/compare_dpf_resampling.py
+
+# Bonus 1: HMC with invertible flows
+python examples/bonus1_hmc_flows/bonus1_hmc_invertible_flows.py
+
+# Bonus 3: SSL models with Particle Gibbs
+python examples/bonus3_neural_ssm/bonus3_example1_gaussian_ssl.py
 ```
 
-This will:
-- Simulate data from the SV model
-- Run the particle filter
-- Plot filtered states and effective sample size (ESS)
-
-### Benchmark Filters
-
-```bash
-python examples/compare_perfromance.py
-```
-
-This compares runtime and performance of:
-- Particle Filter
-- EKF
-- UKF
-
-A sample benchmark output is shown below.
-
 ---
 
-## Benchmark Example
+## Key References
 
-![Benchmark Summary](/results/benchmark_summary.png)
-
----
-
-## Research Direction: Differentiable Particle Filtering
-
-The accompanying LaTeX report (`reports/filters.tex`) discusses:
-- Why resampling breaks differentiability
-- Continuous relaxations using **Gumbel-Softmax / Concrete distributions**
-- Strategies for end-to-end learning in particle filters
-
-Planned extensions include:
-- Differentiable (soft) resampling layers
-- Parameter learning via gradient descent
-- Comparison with non-resampled particle filters
-
----
-
-## References
-
-- Doucet, A., de Freitas, N., & Gordon, N. (2001). *Sequential Monte Carlo Methods in Practice*
-- Maddison et al. (2017). *The Concrete Distribution*
-- Jang et al. (2017). *Categorical Reparameterization with Gumbel-Softmax*
-
----
-
-## Status
-
-🚧 **Research / Experimental Project**  
-This repository is intended for experimentation and learning rather than production use.
-
-Contributions, extensions, and refactors are welcome.
+- [Doucet (2009)] — A tutorial on particle filtering and smoothing
+- [Daum (2010, 2011)] — Exact particle flow for nonlinear filters
+- [Li & Coates (2017)] — Particle filtering with invertible particle flow
+- [Hu (2021)] — Kernel-embedded particle flow filter in RKHS
+- [Dai (2021, 2022)] — Stochastic particle flow and stiffness mitigation
+- [Corenflos (2021)] — Differentiable PF via entropy-regularized OT
+- [Chen (2023)] — Overview of differentiable particle filters
+- [Andrieu et al. (2010)] — Particle MCMC methods
+- [Zheng (2017)] — State-space LSTM with particle MCMC inference
+- [Chaudhari et al. (2025)] — GradNetOT: Learning optimal transport maps with GradNets
+- [Jha (2025)] — Neural operators in scientific computing
