@@ -166,6 +166,7 @@ tensorboard/
 *.fls
 *.blg
 *.bbl
+*.tex
 
 # Experiment data
 data/
@@ -184,3 +185,6 @@ archive/
 
 # Claude
 CLAUDE.md
+
+# Git
+.gitignore
