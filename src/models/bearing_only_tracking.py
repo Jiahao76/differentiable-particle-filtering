@@ -113,14 +113,18 @@ class BearingOnlyTrackingModel(StateSpaceModel):
         quad_form = tf.reduce_sum(diff * tf.linalg.matvec(self.inv_prior_cov, diff), axis=-1)
         return -0.5 * quad_form
     
-    def log_likelihood(self, x, z):
+    def log_likelihood(self, y, x):
         """
-        Log-likelihood: log p(z|x) = -0.5 * (z - h(x))^T R^{-1} (z - h(x)) + const
-        
+        Log-likelihood: log p(y|x) = -0.5 * (y - h(x))^T R^{-1} (y - h(x)) + const
+
+        Args:
+            y: Observations (bearings) of shape (..., 2)
+            x: States (positions) of shape (..., 2)
+
         Note: Handles angle wrapping for residuals
         """
         h_x = self.measurement_function(x)
-        residual = z - h_x
+        residual = y - h_x
         
         # Handle angle wrapping: map to [-π, π]
         residual = tf.math.atan2(tf.sin(residual), tf.cos(residual))
@@ -142,11 +146,11 @@ class BearingOnlyTrackingModel(StateSpaceModel):
         """
         with tf.GradientTape() as tape:
             tape.watch(x)
-            log_lik = self.log_likelihood(x, z)
-        
+            log_lik = self.log_likelihood(z, x)
+
         grad = tape.gradient(log_lik, x)
         return grad
-    
+
     def hessian_log_likelihood_numerical(self, x, z, eps=1e-4):
         """
         Numerical Hessian of log-likelihood using finite differences.
@@ -178,10 +182,10 @@ class BearingOnlyTrackingModel(StateSpaceModel):
                 x_mm[j] -= eps
                 
                 # Evaluate log-likelihood at four points
-                f_pp = self.log_likelihood(tf.constant(x_pp, dtype=tf.float32), z).numpy()
-                f_pm = self.log_likelihood(tf.constant(x_pm, dtype=tf.float32), z).numpy()
-                f_mp = self.log_likelihood(tf.constant(x_mp, dtype=tf.float32), z).numpy()
-                f_mm = self.log_likelihood(tf.constant(x_mm, dtype=tf.float32), z).numpy()
+                f_pp = self.log_likelihood(z, tf.constant(x_pp, dtype=tf.float32)).numpy()
+                f_pm = self.log_likelihood(z, tf.constant(x_pm, dtype=tf.float32)).numpy()
+                f_mp = self.log_likelihood(z, tf.constant(x_mp, dtype=tf.float32)).numpy()
+                f_mm = self.log_likelihood(z, tf.constant(x_mm, dtype=tf.float32)).numpy()
                 
                 # Central difference formula for second derivative
                 hess[i, j] = (f_pp - f_pm - f_mp + f_mm) / (4.0 * eps * eps)

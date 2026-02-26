@@ -88,7 +88,7 @@ class TestStochasticParticleFlowFilter:
         model = scenario.model
         measurement = scenario.z_sample
 
-        ll_truth = model.log_likelihood(model.target_truth, measurement)
-        ll_prior = model.log_likelihood(model.prior_mean, measurement)
+        ll_truth = model.log_likelihood(measurement, model.target_truth)
+        ll_prior = model.log_likelihood(measurement, model.prior_mean)
 
         assert ll_truth > ll_prior

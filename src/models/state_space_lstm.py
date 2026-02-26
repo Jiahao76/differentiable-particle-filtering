@@ -196,19 +196,34 @@ class GaussianSSL(StateSpaceLSTM):
         log_std = params[..., self.obs_dim:]
         std = tf.nn.softplus(log_std) + self.min_std
         return mean, std
-    
+
+    def observation_mean(self, z: tf.Tensor) -> tf.Tensor:
+        """Deterministic observation function: E[x_t | z_t].
+
+        Args:
+            z: Latent state [batch, state_dim]
+
+        Returns:
+            Emission mean [batch, obs_dim]
+        """
+        if self.lstm_state is None:
+            raise RuntimeError("LSTM state not initialized. Call reset_lstm_state() first.")
+        lstm_output = self.lstm_state[0]
+        mean, _ = self.get_emission_params(lstm_output, z)
+        return mean
+
     def sample_transition(
-        self, 
-        z_prev: tf.Tensor, 
+        self,
+        z_prev: tf.Tensor,
         training: bool = True
     ) -> Tuple[tf.Tensor, tf.Tensor]:
         """
         Sample next latent state: z_t ~ p(z_t | z_{t-1})
-        
+
         Args:
             z_prev: Previous latent state [batch, state_dim]
             training: Whether in training mode
-            
+
         Returns:
             z_next: Next latent state [batch, state_dim]
             log_prob: Log probability log p(z_t | z_{t-1})
@@ -230,25 +245,25 @@ class GaussianSSL(StateSpaceLSTM):
         
         return z_next, log_prob
     
-    def log_likelihood(self, x: tf.Tensor, z: tf.Tensor) -> tf.Tensor:
+    def log_likelihood(self, y: tf.Tensor, x: tf.Tensor) -> tf.Tensor:
         """
-        Compute emission log likelihood: log p(x_t | z_t)
-        
+        Compute emission log likelihood: log p(y | x)
+
         Args:
-            x: Observations [batch, obs_dim]
-            z: Latent states [batch, state_dim]
-            
+            y: Observations [batch, obs_dim]
+            x: Latent states [batch, state_dim]
+
         Returns:
             log_lik: Log likelihood [batch]
         """
         # Get LSTM output for current time step
         # Note: This assumes lstm_state is already set by transition
         lstm_output = self.lstm_state[0]  # Use hidden state
-        
-        mean, std = self.get_emission_params(lstm_output, z)
-        
+
+        mean, std = self.get_emission_params(lstm_output, x)
+
         log_lik = -0.5 * tf.reduce_sum(
-            tf.square((x - mean) / std) + 2 * tf.math.log(std) + 
+            tf.square((y - mean) / std) + 2 * tf.math.log(std) +
             tf.math.log(2 * np.pi),
             axis=-1
         )
@@ -385,7 +400,23 @@ class TopicalSSL(StateSpaceLSTM):
             y = tf.stop_gradient(y_hard - y) + y
         
         return y
-    
+
+    def observation_mean(self, z: tf.Tensor) -> tf.Tensor:
+        """Deterministic observation function: E[x_t | z_t].
+
+        Args:
+            z: Latent topic distribution [batch, num_topics]
+
+        Returns:
+            Word distribution [batch, vocab_size]
+        """
+        if self.lstm_state is None:
+            raise RuntimeError("LSTM state not initialized. Call reset_lstm_state() first.")
+        lstm_output = self.lstm_state[0]
+        inputs = tf.concat([lstm_output, z], axis=-1)
+        logits = self.emission_net(inputs)
+        return tf.nn.softmax(logits)
+
     def sample_transition(
         self,
         z_prev: tf.Tensor,
@@ -418,26 +449,26 @@ class TopicalSSL(StateSpaceLSTM):
         
         return z_next, log_prob
     
-    def log_likelihood(self, x: tf.Tensor, z: tf.Tensor) -> tf.Tensor:
+    def log_likelihood(self, y: tf.Tensor, x: tf.Tensor) -> tf.Tensor:
         """
-        Compute emission log likelihood: log p(x_t | z_t)
-        
+        Compute emission log likelihood: log p(y | x)
+
         Args:
-            x: Observations (word one-hot or soft) [batch, vocab_size]
-            z: Latent topics (one-hot or soft) [batch, num_topics]
-            
+            y: Observations (word one-hot or soft) [batch, vocab_size]
+            x: Latent topics (one-hot or soft) [batch, num_topics]
+
         Returns:
             log_lik: Log likelihood [batch]
         """
         lstm_output = self.lstm_state[0]
-        
+
         # Concatenate LSTM output and topic
-        inputs = tf.concat([lstm_output, z], axis=-1)
+        inputs = tf.concat([lstm_output, x], axis=-1)
         logits = self.emission_net(inputs)
-        
+
         log_probs = tf.nn.log_softmax(logits)
-        log_lik = tf.reduce_sum(x * log_probs, axis=-1)
-        
+        log_lik = tf.reduce_sum(y * log_probs, axis=-1)
+
         return log_lik
     
     def sample_trajectory(

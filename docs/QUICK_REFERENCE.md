@@ -233,7 +233,4 @@ def characterize_problem(particles, observations, model):
 
 ---
 
-**Status**: ✅ Production ready  
-**Last Updated**: February 9, 2026  
-**Maintainer**: GitHub Copilot  
-**Questions?** See [DOCUMENTATION_INDEX.md](DOCUMENTATION_INDEX.md)
+**Last Updated**: February 2026

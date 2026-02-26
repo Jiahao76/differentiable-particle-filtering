@@ -81,6 +81,25 @@ class StateSpaceModel(ABC):
             tf.Tensor: Log-likelihood of shape (N,).
         """
 
+    def transition_log_pdf(self, x_curr, x_prev):
+        """
+        Compute log p(x_curr | x_prev) under the transition model.
+
+        Required by particle flow filters (PFPF) for prior ratio computation.
+        Subclasses that will be used with PFPF must override this method.
+
+        Args:
+            x_curr (tf.Tensor): Current state of shape (N, state_dim).
+            x_prev (tf.Tensor): Previous state of shape (N, state_dim).
+
+        Returns:
+            tf.Tensor: Log transition probability of shape (N,).
+        """
+        raise NotImplementedError(
+            f"{type(self).__name__} does not implement transition_log_pdf(). "
+            "This is required by particle flow filters (PFPF)."
+        )
+
     def transition_jacobian(self, x):
         """
         Compute Jacobian df/dx of the transition function via AutoDiff.

@@ -68,7 +68,7 @@ class TFStochasticParticleFlowFilter:
                 
                 # Log-densities
                 log_p0 = model.log_prior(x)
-                log_h = model.log_likelihood(x, z)
+                log_h = model.log_likelihood(z, x)
                 
                 # Homotopy log-density: log p = (α+β)*log p_0 + β*log h
                 # Note: α + β = 1 for normalized homotopy
